@@ -2,7 +2,7 @@
 from typing import List, Dict
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
-from pptx.dml.color import RgbColor
+from pptx.dml.color import RGBColor
 from PIL import Image
 import io
 
@@ -91,7 +91,7 @@ class PptxService:
             r = int(hex_color[0:2], 16)
             g = int(hex_color[2:4], 16)
             b = int(hex_color[4:6], 16)
-            p.font.color.rgb = RgbColor(r, g, b)
+            p.font.color.rgb = RGBColor(r, g, b)
     
     def save(self) -> bytes:
         """儲存並返回 PPTX bytes"""
