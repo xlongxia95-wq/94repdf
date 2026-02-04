@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>94RePdf - 就是讓 PDF 重生</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- 密碼驗證區 -->
+    <div id="auth-screen" class="screen active">
+        <div class="auth-container">
+            <h1>94RePdf</h1>
+            <p class="slogan">就是讓 PDF 重生</p>
+            <div class="auth-form">
+                <input type="password" id="password-input" placeholder="請輸入密碼" />
+                <button id="auth-btn">進入</button>
+            </div>
+            <p class="auth-warning">⚠️ 輸錯 5 次將鎖定 10 分鐘</p>
+        </div>
+    </div>
+
+    <!-- 主畫面 -->
+    <div id="main-screen" class="screen">
+        <header>
+            <h1>94RePdf</h1>
+            <span class="slogan">就是讓 PDF 重生</span>
+        </header>
+
+        <!-- 功能選擇 -->
+        <section id="feature-section" class="section active">
+            <h2>選擇功能</h2>
+            <div class="feature-grid">
+                <div class="feature-card" data-feature="pptx">
+                    <span class="icon">📊</span>
+                    <h3>轉 PPTX</h3>
+                    <p>PDF 轉可編輯簡報</p>
+                    <span class="badge">⭐ 核心</span>
+                </div>
+                <div class="feature-card" data-feature="quick-edit">
+                    <span class="icon">✏️</span>
+                    <h3>快速編輯</h3>
+                    <p>線上修改文字</p>
+                    <span class="badge new">新功能</span>
+                </div>
+                <div class="feature-card" data-feature="image">
+                    <span class="icon">🖼️</span>
+                    <h3>轉圖片</h3>
+                    <p>PDF 轉 PNG/JPG</p>
+                </div>
+                <div class="feature-card" data-feature="rotate">
+                    <span class="icon">🔄</span>
+                    <h3>旋轉</h3>
+                    <p>調整頁面方向</p>
+                </div>
+                <div class="feature-card" data-feature="resize">
+                    <span class="icon">📐</span>
+                    <h3>調尺寸</h3>
+                    <p>調整頁面大小</p>
+                </div>
+                <div class="feature-card" data-feature="page-number">
+                    <span class="icon">🔢</span>
+                    <h3>加頁碼</h3>
+                    <p>自動添加頁碼</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 上傳區域 -->
+        <section id="upload-section" class="section">
+            <button class="back-btn" onclick="showSection('feature-section')">← 返回</button>
+            <h2 id="upload-title">上傳檔案</h2>
+            
+            <div id="drop-zone" class="drop-zone">
+                <span class="icon">📄</span>
+                <p>拖放 PDF 檔案至此</p>
+                <p>或點擊選擇檔案</p>
+                <input type="file" id="file-input" accept=".pdf,.png,.jpg,.jpeg" hidden />
+                <p class="hint">支援 PDF、PNG、JPG，最大 50MB</p>
+            </div>
+        </section>
+
+        <!-- 分析結果 -->
+        <section id="analyze-section" class="section">
+            <button class="back-btn" onclick="showSection('upload-section')">← 返回</button>
+            <h2>分析結果</h2>
+            
+            <div class="file-info">
+                <span class="icon">📄</span>
+                <div>
+                    <p id="file-name">簡報.pdf</p>
+                    <p id="file-meta">10 頁 · 2.3 MB</p>
+                </div>
+            </div>
+
+            <div class="analyze-result">
+                <h3>📊 偵測結果</h3>
+                <div id="analyze-details">
+                    <p><strong>原始尺寸：</strong><span id="original-size">B4 (257 × 364 mm)</span></p>
+                    <p><strong>頁面方向：</strong><span id="orientation">直向</span></p>
+                    <p><strong>檔案類型：</strong><span id="pdf-type">圖片式 PDF（需要 AI 辨識）</span></p>
+                </div>
+                <div class="cost-estimate">
+                    <p>💰 費用預估：<strong id="cost">約 $0.17（約 NT$5）</strong></p>
+                </div>
+            </div>
+
+            <div class="output-settings">
+                <h3>📐 輸出設定</h3>
+                <div class="setting-group">
+                    <label>輸出格式：</label>
+                    <select id="output-format">
+                        <option value="A4">A4</option>
+                        <option value="original">原始尺寸</option>
+                        <option value="custom">自訂</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>投影片比例：</label>
+                    <select id="slide-ratio">
+                        <option value="16:9">16:9（寬螢幕）</option>
+                        <option value="4:3">4:3（傳統）</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>
+                        <input type="checkbox" id="remove-watermark" />
+                        移除 AI 浮水印（Nano Banana 星星）
+                    </label>
+                </div>
+            </div>
+
+            <button id="process-btn" class="primary-btn">開始處理</button>
+        </section>
+
+        <!-- 處理進度 -->
+        <section id="progress-section" class="section">
+            <h2>處理中...</h2>
+            
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <p id="progress-text">0%</p>
+            
+            <div class="progress-details">
+                <p>目前：第 <span id="current-page">1</span>/<span id="total-pages">10</span> 頁</p>
+                <p>步驟：<span id="current-step">OCR 文字辨識</span></p>
+                <p>預估剩餘：<span id="time-remaining">約 2 分鐘</span></p>
+            </div>
+
+            <div id="page-thumbnails" class="page-thumbnails">
+                <!-- 動態生成 -->
+            </div>
+        </section>
+
+        <!-- 結果預覽 -->
+        <section id="result-section" class="section">
+            <h2>✅ 處理完成</h2>
+            
+            <div id="ocr-warning" class="warning" style="display: none;">
+                <p>⚠️ 偵測到 <span id="error-count">3</span> 處可能的 OCR 錯誤，建議檢查</p>
+                <button class="link-btn">查看所有疑似錯誤</button>
+            </div>
+
+            <div class="preview-container">
+                <div id="preview-area" class="preview-area">
+                    <!-- 預覽圖片 -->
+                </div>
+                <div class="preview-nav">
+                    <button id="prev-page">◀ 上一頁</button>
+                    <span>第 <span id="preview-current">1</span> / <span id="preview-total">10</span> 頁</span>
+                    <button id="next-page">下一頁 ▶</button>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button id="download-pptx" class="primary-btn">下載 PPTX</button>
+                <button id="download-pdf" class="secondary-btn">下載 PDF</button>
+                <button id="reprocess" class="secondary-btn">重新處理</button>
+            </div>
+        </section>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

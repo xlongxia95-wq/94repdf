@@ -1,0 +1,22 @@
+# Web 框架
+fastapi>=0.109.0
+uvicorn>=0.27.0
+python-multipart>=0.0.6
+
+# PDF 處理
+pypdf>=4.0.0
+pdf2image>=1.17.0
+
+# 圖片處理
+Pillow>=10.0.0
+
+# PPTX 生成
+python-pptx>=0.6.23
+
+# Google Cloud
+google-cloud-storage>=2.14.0
+google-generativeai>=0.4.0
+
+# 其他
+python-dotenv>=1.0.0
+aiofiles>=23.2.1
