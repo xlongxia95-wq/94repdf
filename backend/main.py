@@ -2,6 +2,9 @@
 94RePdf - 就是讓 PDF 重生
 FastAPI 後端入口
 """
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
