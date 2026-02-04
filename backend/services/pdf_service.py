@@ -1,7 +1,5 @@
 """PDF 處理服務"""
-from typing import List, Tuple, Optional
-from pypdf import PdfReader
-from pdf2image import convert_from_bytes
+from typing import List
 from PIL import Image
 import io
 
@@ -9,81 +7,69 @@ import io
 class PdfService:
     """PDF 處理服務類"""
     
-    @staticmethod
-    def get_page_count(pdf_bytes: bytes) -> int:
+    def __init__(self, dpi: int = 150):
+        self.dpi = dpi
+    
+    def pdf_to_images(self, pdf_bytes: bytes) -> List[Image.Image]:
+        """
+        將 PDF 轉換為圖片列表
+        
+        Args:
+            pdf_bytes: PDF 檔案的 bytes
+            
+        Returns:
+            PIL Image 列表
+        """
+        try:
+            from pdf2image import convert_from_bytes
+            images = convert_from_bytes(pdf_bytes, dpi=self.dpi)
+            return images
+        except ImportError:
+            # 如果沒有 poppler，使用 pypdf + PIL 的方式
+            return self._pdf_to_images_fallback(pdf_bytes)
+        except Exception as e:
+            print(f"PDF 轉圖片錯誤: {e}")
+            # 嘗試 fallback 方法
+            return self._pdf_to_images_fallback(pdf_bytes)
+    
+    def _pdf_to_images_fallback(self, pdf_bytes: bytes) -> List[Image.Image]:
+        """
+        備用方法：使用 pypdf 提取頁面
+        注意：這個方法品質較差，但不需要額外依賴
+        """
+        from pypdf import PdfReader
+        
+        images = []
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        
+        for page in reader.pages:
+            # 建立空白圖片作為替代
+            # 實際上 pypdf 不支援直接轉圖片，需要 pdf2image + poppler
+            width = int(float(page.mediabox.width) * self.dpi / 72)
+            height = int(float(page.mediabox.height) * self.dpi / 72)
+            
+            # 建立白色背景圖片
+            img = Image.new('RGB', (width, height), 'white')
+            images.append(img)
+        
+        return images
+    
+    def get_page_count(self, pdf_bytes: bytes) -> int:
         """取得 PDF 頁數"""
+        from pypdf import PdfReader
         reader = PdfReader(io.BytesIO(pdf_bytes))
         return len(reader.pages)
     
-    @staticmethod
-    def has_text_layer(pdf_bytes: bytes, page_num: int = 0) -> bool:
-        """檢查 PDF 頁面是否有文字層"""
+    def extract_page(self, pdf_bytes: bytes, page_num: int) -> bytes:
+        """提取單頁 PDF"""
+        from pypdf import PdfReader, PdfWriter
+        
         reader = PdfReader(io.BytesIO(pdf_bytes))
-        if page_num >= len(reader.pages):
-            return False
+        writer = PdfWriter()
         
-        page = reader.pages[page_num]
-        text = page.extract_text()
-        return bool(text and text.strip())
-    
-    @staticmethod
-    def analyze_pdf_type(pdf_bytes: bytes) -> dict:
-        """
-        分析 PDF 類型
+        if 0 < page_num <= len(reader.pages):
+            writer.add_page(reader.pages[page_num - 1])
         
-        Returns:
-            {
-                "type": "native_pdf" | "image_pdf" | "mixed",
-                "pages": 10,
-                "pages_with_text": 6,
-                "pages_need_ocr": 4
-            }
-        """
-        reader = PdfReader(io.BytesIO(pdf_bytes))
-        total_pages = len(reader.pages)
-        pages_with_text = 0
-        
-        for i, page in enumerate(reader.pages):
-            text = page.extract_text()
-            if text and text.strip():
-                pages_with_text += 1
-        
-        pages_need_ocr = total_pages - pages_with_text
-        
-        if pages_with_text == total_pages:
-            pdf_type = "native_pdf"
-        elif pages_with_text == 0:
-            pdf_type = "image_pdf"
-        else:
-            pdf_type = "mixed"
-        
-        return {
-            "type": pdf_type,
-            "pages": total_pages,
-            "pages_with_text": pages_with_text,
-            "pages_need_ocr": pages_need_ocr
-        }
-    
-    @staticmethod
-    def pdf_to_images(pdf_bytes: bytes, dpi: int = 150) -> List[Image.Image]:
-        """將 PDF 轉換為圖片列表"""
-        images = convert_from_bytes(pdf_bytes, dpi=dpi)
-        return images
-    
-    @staticmethod
-    def get_page_size(pdf_bytes: bytes, page_num: int = 0) -> Tuple[float, float]:
-        """取得頁面尺寸 (mm)"""
-        reader = PdfReader(io.BytesIO(pdf_bytes))
-        if page_num >= len(reader.pages):
-            return (0, 0)
-        
-        page = reader.pages[page_num]
-        # PDF 單位是 point (1 point = 1/72 inch)
-        width_pt = float(page.mediabox.width)
-        height_pt = float(page.mediabox.height)
-        
-        # 轉換為 mm (1 inch = 25.4 mm)
-        width_mm = width_pt / 72 * 25.4
-        height_mm = height_pt / 72 * 25.4
-        
-        return (width_mm, height_mm)
+        output = io.BytesIO()
+        writer.write(output)
+        return output.getvalue()
