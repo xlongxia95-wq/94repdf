@@ -3,7 +3,10 @@
  * 前端主程式
  */
 
-const API_BASE = '/api';
+// API 位置（部署時會設定為雲端 URL）
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? '/api'
+    : 'https://steven-fame-pod-vacancies.trycloudflare.com/api';
 
 // 狀態
 let state = {
