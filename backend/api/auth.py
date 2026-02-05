@@ -7,7 +7,9 @@ import os
 router = APIRouter()
 
 # 從環境變數讀取密碼 hash
-PASSWORD_HASH = os.getenv("PASSWORD_HASH", "")
+# 預設值為 "password" 的 SHA256（開發用）
+DEFAULT_HASH = "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8"
+PASSWORD_HASH = os.getenv("PASSWORD_HASH", DEFAULT_HASH)
 
 
 class VerifyRequest(BaseModel):
