@@ -208,9 +208,24 @@ function updateAnalyzeUI(filename, size, analysis) {
     };
     document.getElementById('pdf-type').textContent = typeLabels[analysis.type] || analysis.type;
     
-    // 免費額度內不收費
-    document.getElementById('cost').textContent = '🆓 免費';
-    document.getElementById('cost').title = '使用 Gemini 免費額度，每日限處理約 1500 頁';
+    // 費用計算：Gemini 2.0 Flash
+    // 每頁約 $0.0004 USD = NT$0.012
+    const pages = analysis.pages || 10;
+    const costPerPage = 0.0004; // USD
+    const totalUSD = pages * costPerPage;
+    const totalTWD = totalUSD * 31;
+    
+    // 免費額度內（每日 500 請求）
+    if (pages <= 500) {
+        document.getElementById('cost').innerHTML = 
+            `🆓 <span style="color: green;">免費額度內</span><br>` +
+            `<small style="color: #666;">超出額度：約 $${totalUSD.toFixed(4)} USD (NT$${totalTWD.toFixed(2)})</small>`;
+    } else {
+        document.getElementById('cost').textContent = 
+            `約 $${totalUSD.toFixed(4)} USD (NT$${totalTWD.toFixed(2)})`;
+    }
+    document.getElementById('cost').title = 
+        `Gemini 2.0 Flash: 每頁約 NT$0.012\n免費額度：每日 500 請求`;
 }
 
 // ===== 處理 =====

@@ -60,10 +60,12 @@ async def analyze_pdf(file_id: str):
             orientation="portrait",
             is_notebooklm=True,
             has_watermark=True,
+            # Gemini 2.0 Flash 定價：Input $0.10/1M, Output $0.40/1M
+            # 每頁成本：~810 input tokens + ~800 output tokens = $0.0004/頁
             estimated_cost=EstimatedCost(
-                ocr=0.008,
-                inpainting=0.16,
-                total=0.168
+                ocr=0.004,      # 10 頁 × $0.0004 = $0.004
+                inpainting=0,  # 使用簡單背景填充，不調用 API
+                total=0.004    # 約 NT$0.12（免費額度內為 $0）
             )
         )
     )
