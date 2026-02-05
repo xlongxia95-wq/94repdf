@@ -50,18 +50,26 @@ function initAuth() {
 }
 
 async function handleAuth() {
+    console.log('handleAuth called');
     const password = elements.passwordInput.value;
-    if (!password) return;
+    console.log('Password entered:', password ? '***' : 'empty');
+    if (!password) {
+        alert('請輸入密碼');
+        return;
+    }
     
     try {
+        console.log('Calling API:', API_BASE + '/auth/verify');
         const res = await fetch(`${API_BASE}/auth/verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ password })
         });
         
+        console.log('API response:', res.status);
         if (res.ok) {
             setCookie('authenticated', 'true', 7);
+            console.log('Showing main screen...');
             showMainScreen();
         } else {
             alert('密碼錯誤');
@@ -69,8 +77,7 @@ async function handleAuth() {
         }
     } catch (err) {
         console.error('Auth error:', err);
-        // 開發模式：跳過驗證
-        showMainScreen();
+        alert('連線錯誤: ' + err.message);
     }
 }
 
