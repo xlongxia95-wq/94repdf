@@ -10,7 +10,11 @@ load_dotenv()
 import google.generativeai as genai
 
 # 設定 API Key
-genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+else:
+    print("⚠️ GEMINI_API_KEY not set - Gemini OCR will not work")
 
 
 class GeminiService:

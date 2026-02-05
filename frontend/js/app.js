@@ -293,6 +293,7 @@ async function handleFile(file) {
         state.fileId = uploadData.file_id;
         
         const analyzeRes = await fetch(`${API_BASE}/analyze/${state.fileId}`);
+        if (!analyzeRes.ok) throw new Error('分析失敗');
         const analyzeData = await analyzeRes.json();
         state.analysis = analyzeData.analysis;
         
@@ -485,6 +486,11 @@ async function processWithGemini(outputRatio, removeWatermark) {
             })
         });
         
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.detail || '處理請求失敗');
+        }
+        
         const data = await res.json();
         state.taskId = data.task_id;
         
@@ -500,6 +506,9 @@ async function processWithGemini(outputRatio, removeWatermark) {
 async function pollProgress() {
     try {
         const res = await fetch(`${API_BASE}/process/status/${state.taskId}`);
+        if (!res.ok) {
+            throw new Error('狀態查詢失敗');
+        }
         const data = await res.json();
         
         updateProgress(data.progress);
