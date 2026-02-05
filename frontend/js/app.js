@@ -208,8 +208,9 @@ function updateAnalyzeUI(filename, size, analysis) {
     };
     document.getElementById('pdf-type').textContent = typeLabels[analysis.type] || analysis.type;
     
-    document.getElementById('cost').textContent = 
-        `約 $${analysis.estimated_cost.total}（約 NT$${Math.round(analysis.estimated_cost.total * 31)}）`;
+    // 免費額度內不收費
+    document.getElementById('cost').textContent = '🆓 免費';
+    document.getElementById('cost').title = '使用 Gemini 免費額度，每日限處理約 1500 頁';
 }
 
 // ===== 處理 =====
