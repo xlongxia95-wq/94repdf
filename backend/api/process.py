@@ -77,10 +77,21 @@ async def process_pdf_to_pptx(task_id: str, file_id: str, output_ratio: str, rem
         if not content:
             raise Exception("檔案內容為空")
         
-        # PDF 轉圖片
+        filename = file_info.get("filename", "").lower()
+        
+        # 根據檔案類型處理
         task_status[task_id]["progress"]["current_step"] = "converting"
-        pdf_service = PdfService()
-        images = pdf_service.pdf_to_images(content)
+        
+        if filename.endswith(('.png', '.jpg', '.jpeg')):
+            # 圖片直接打開
+            img = Image.open(io.BytesIO(content))
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            images = [img]
+        else:
+            # PDF 轉圖片
+            pdf_service = PdfService()
+            images = pdf_service.pdf_to_images(content)
         
         total_pages = len(images)
         task_status[task_id]["progress"]["total_pages"] = total_pages
