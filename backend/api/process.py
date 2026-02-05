@@ -19,6 +19,7 @@ class ProcessPptxRequest(BaseModel):
     output_ratio: str = "16:9"
     remove_watermark: bool = False
     pages: Optional[List[int]] = None
+    use_local: bool = True  # True = 本地 Ollama，False = Gemini API
 
 
 class ProcessImageRequest(BaseModel):
@@ -42,18 +43,29 @@ class TaskStatus(BaseModel):
     result_url: Optional[str] = None
 
 
-async def process_pdf_to_pptx(task_id: str, file_id: str, output_ratio: str, remove_watermark: bool, pages: Optional[List[int]]):
-    """背景任務：處理 PDF 轉 PPTX"""
+async def process_pdf_to_pptx(task_id: str, file_id: str, output_ratio: str, remove_watermark: bool, pages: Optional[List[int]], use_local: bool = True):
+    """背景任務：處理 PDF 轉 PPTX
+    
+    Args:
+        use_local: True = 本地 Ollama 模型（默認），False = Gemini API
+    """
     from api.upload import get_file_content, get_file_info
     from services.pdf_service import PdfService
-    from services.gemini_service import GeminiService
     from services.pptx_service import PptxService
     from PIL import Image
+    
+    # 選擇 OCR 服務
+    if use_local:
+        from services.ollama_service import OllamaService
+        ocr_service = OllamaService()
+    else:
+        from services.gemini_service import GeminiService
+        ocr_service = GeminiService()
     
     try:
         task_status[task_id] = {
             "status": "processing",
-            "progress": {"current_page": 0, "total_pages": 0, "current_step": "init", "percent": 0}
+            "progress": {"current_page": 0, "total_pages": 0, "current_step": "init", "percent": 0, "mode": "local" if use_local else "cloud"}
         }
         
         # 取得檔案
@@ -78,8 +90,7 @@ async def process_pdf_to_pptx(task_id: str, file_id: str, output_ratio: str, rem
             images = [images[i-1] for i in pages if 0 < i <= len(images)]
             total_pages = len(images)
         
-        # 初始化服務
-        gemini = GeminiService()
+        # 初始化 PPTX 服務
         pptx = PptxService(ratio=output_ratio)
         
         for i, img in enumerate(images):
@@ -92,15 +103,15 @@ async def process_pdf_to_pptx(task_id: str, file_id: str, output_ratio: str, rem
             img.save(img_bytes, format='PNG')
             img_bytes = img_bytes.getvalue()
             
-            # Step 1: OCR
+            # Step 1: OCR（本地或雲端）
             task_status[task_id]["progress"]["current_step"] = "ocr"
-            ocr_result = await gemini.ocr_image(img_bytes, img.width, img.height)
+            ocr_result = await ocr_service.ocr_image(img_bytes, img.width, img.height)
             texts = ocr_result.get("texts", [])
             
             # Step 2: Inpainting（移除文字區域）
             task_status[task_id]["progress"]["current_step"] = "inpainting"
             if texts:
-                bg_bytes = await gemini.inpaint_background(img_bytes, texts)
+                bg_bytes = await ocr_service.inpaint_background(img_bytes, texts)
                 bg_img = Image.open(io.BytesIO(bg_bytes))
             else:
                 bg_img = img
@@ -128,7 +139,11 @@ async def process_pdf_to_pptx(task_id: str, file_id: str, output_ratio: str, rem
 
 @router.post("/pptx", response_model=ProcessResponse)
 async def process_to_pptx(request: ProcessPptxRequest, background_tasks: BackgroundTasks):
-    """將 PDF 轉換為可編輯的 PPTX"""
+    """將 PDF 轉換為可編輯的 PPTX
+    
+    use_local=True（默認）: 使用本地 Ollama 視覺模型
+    use_local=False: 使用 Gemini API
+    """
     task_id = str(uuid.uuid4())
     
     # 加入背景任務
@@ -138,7 +153,8 @@ async def process_to_pptx(request: ProcessPptxRequest, background_tasks: Backgro
         request.file_id,
         request.output_ratio,
         request.remove_watermark,
-        request.pages
+        request.pages,
+        request.use_local
     )
     
     task_status[task_id] = {
