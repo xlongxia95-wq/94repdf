@@ -54,6 +54,9 @@ async def upload_file(file: UploadFile = File(...)):
     if filename_lower.endswith('.pdf'):
         try:
             pdf = PdfReader(io.BytesIO(content))
+            # 檢查是否加密
+            if pdf.is_encrypted:
+                raise HTTPException(status_code=400, detail="不支援密碼保護的 PDF，請先解除密碼")
             pages = len(pdf.pages)
             if pages == 0:
                 raise HTTPException(status_code=400, detail="PDF 沒有頁面")
