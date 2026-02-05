@@ -573,9 +573,33 @@ function showOCRResult(result, imageData) {
 
 function setupDownloadButtons() {
     const downloadPptx = document.getElementById('download-pptx');
+    const downloadPdf = document.getElementById('download-pdf');
+    const reprocess = document.getElementById('reprocess');
+    
+    // PPTX 下載
     downloadPptx.textContent = '⬇️ 下載 PPTX';
     downloadPptx.onclick = async () => {
         window.location.href = `${API_BASE}/download/${state.taskId}`;
+    };
+    
+    // PDF 下載（原始檔案）
+    downloadPdf.textContent = '📄 下載原始 PDF';
+    downloadPdf.onclick = async () => {
+        if (state.uploadedFile) {
+            const url = URL.createObjectURL(state.uploadedFile);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = state.uploadedFile.name;
+            link.click();
+            URL.revokeObjectURL(url);
+        } else {
+            alert('原始檔案不可用');
+        }
+    };
+    
+    // 重新處理
+    reprocess.onclick = () => {
+        showSection('analyze-section');
     };
 }
 
