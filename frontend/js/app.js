@@ -14,7 +14,9 @@ let state = {
     currentFeature: null,
     fileId: null,
     taskId: null,
-    analysis: null
+    analysis: null,
+    ocrMode: 'local',  // 'local' 或 'ai'
+    uploadedFile: null  // 儲存上傳的檔案供本地處理
 };
 
 // DOM 元素
@@ -34,7 +36,44 @@ document.addEventListener('DOMContentLoaded', () => {
     initUpload();
     initFeatureCards();
     initProcess();
+    initOcrModeSelector();
 });
+
+// ===== OCR 模式選擇 =====
+function initOcrModeSelector() {
+    document.querySelectorAll('.ocr-mode-card').forEach(card => {
+        card.addEventListener('click', () => {
+            // 移除其他選擇
+            document.querySelectorAll('.ocr-mode-card').forEach(c => c.classList.remove('selected'));
+            // 選擇當前
+            card.classList.add('selected');
+            state.ocrMode = card.dataset.mode;
+            
+            // 更新費用顯示
+            updateCostDisplay();
+            
+            console.log('OCR mode selected:', state.ocrMode);
+        });
+    });
+}
+
+function updateCostDisplay() {
+    const costEl = document.getElementById('cost');
+    const pages = state.analysis?.pages || 10;
+    
+    if (state.ocrMode === 'local') {
+        costEl.innerHTML = `🆓 <span style="color: green;">完全免費</span>`;
+        costEl.title = '本地處理：在你的裝置上執行，完全免費';
+    } else {
+        const costPerPage = 0.0004;
+        const totalUSD = pages * costPerPage;
+        const totalTWD = totalUSD * 31;
+        costEl.innerHTML = 
+            `🆓 <span style="color: green;">免費額度內</span><br>` +
+            `<small style="color: #666;">超出：$${totalUSD.toFixed(4)} (NT$${totalTWD.toFixed(2)})</small>`;
+        costEl.title = 'AI 模式：Gemini 2.0 Flash，每頁約 NT$0.012';
+    }
+}
 
 // ===== 密碼驗證 =====
 function initAuth() {
@@ -160,8 +199,11 @@ async function handleFile(file) {
         return;
     }
     
+    // 儲存檔案供本地處理使用
+    state.uploadedFile = file;
+    
     try {
-        // 上傳檔案
+        // 上傳檔案到後端（AI 模式需要）
         const formData = new FormData();
         formData.append('file', file);
         
@@ -186,7 +228,15 @@ async function handleFile(file) {
         
     } catch (err) {
         console.error('Upload error:', err);
-        alert('上傳失敗，請稍後再試');
+        // 即使上傳失敗，本地模式仍可使用
+        state.analysis = {
+            pages: 1,
+            original_size: { name: 'Unknown', width_mm: 0, height_mm: 0 },
+            orientation: 'portrait',
+            type: 'image_pdf'
+        };
+        updateAnalyzeUI(file.name, file.size, state.analysis);
+        showSection('analyze-section');
     }
 }
 
@@ -237,9 +287,141 @@ async function startProcess() {
     const outputRatio = document.getElementById('slide-ratio').value;
     const removeWatermark = document.getElementById('remove-watermark').checked;
     
+    showSection('progress-section');
+    
+    if (state.ocrMode === 'local') {
+        // 本地 OCR 模式
+        await processWithLocalOCR();
+    } else {
+        // AI 模式（使用後端 Gemini）
+        await processWithAI(outputRatio, removeWatermark);
+    }
+}
+
+// ===== 本地 OCR 處理 =====
+async function processWithLocalOCR() {
     try {
-        showSection('progress-section');
+        updateProgressUI(0, 1, 1, 'initializing');
         
+        const file = state.uploadedFile;
+        if (!file) {
+            alert('請先上傳檔案');
+            return;
+        }
+        
+        // 初始化 Tesseract worker
+        updateProgressUI(5, 1, 1, 'loading');
+        const worker = await Tesseract.createWorker('chi_tra+eng', 1, {
+            logger: m => {
+                if (m.status === 'recognizing text') {
+                    const percent = Math.round(10 + m.progress * 80);
+                    updateProgressUI(percent, 1, 1, 'ocr');
+                }
+            }
+        });
+        
+        let imageData;
+        
+        // 如果是圖片，直接處理
+        if (file.type.startsWith('image/')) {
+            imageData = await fileToDataURL(file);
+        } else {
+            // PDF 需要轉成圖片（使用 canvas）
+            // 簡化版：提示用戶先轉成圖片
+            alert('本地模式目前只支援圖片（PNG/JPG）。\nPDF 請使用 AI 模式，或先將 PDF 轉成圖片。');
+            await worker.terminate();
+            showSection('analyze-section');
+            return;
+        }
+        
+        // 執行 OCR
+        updateProgressUI(10, 1, 1, 'ocr');
+        const { data } = await worker.recognize(imageData);
+        
+        updateProgressUI(90, 1, 1, 'generating');
+        
+        // 顯示 OCR 結果
+        console.log('OCR Result:', data);
+        
+        // 儲存結果
+        state.ocrResult = data;
+        
+        await worker.terminate();
+        
+        updateProgressUI(100, 1, 1, 'done');
+        
+        // 顯示結果
+        setTimeout(() => {
+            showOCRResult(data, imageData);
+        }, 500);
+        
+    } catch (err) {
+        console.error('Local OCR error:', err);
+        alert('本地 OCR 處理失敗：' + err.message);
+        showSection('analyze-section');
+    }
+}
+
+function fileToDataURL(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+function showOCRResult(ocrData, imageData) {
+    showSection('result-section');
+    
+    // 顯示預覽圖片
+    const previewArea = document.getElementById('preview-area');
+    previewArea.innerHTML = `
+        <div style="position: relative; width: 100%;">
+            <img src="${imageData}" style="max-width: 100%; height: auto;" />
+            <div style="margin-top: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 0.5rem;">
+                <h4>📝 OCR 辨識結果</h4>
+                <pre style="white-space: pre-wrap; font-size: 14px; max-height: 300px; overflow-y: auto;">${ocrData.text}</pre>
+                <p style="margin-top: 0.5rem; color: #666;">信心度：${Math.round(ocrData.confidence)}%</p>
+            </div>
+        </div>
+    `;
+    
+    // 更新下載按鈕
+    document.getElementById('download-pptx').textContent = '複製文字';
+    document.getElementById('download-pptx').onclick = () => {
+        navigator.clipboard.writeText(ocrData.text);
+        alert('已複製到剪貼簿！');
+    };
+    
+    document.getElementById('download-pdf').textContent = '下載原圖';
+    document.getElementById('download-pdf').onclick = () => {
+        const link = document.createElement('a');
+        link.href = imageData;
+        link.download = 'result.png';
+        link.click();
+    };
+}
+
+function updateProgressUI(percent, current, total, step) {
+    document.getElementById('progress-fill').style.width = `${percent}%`;
+    document.getElementById('progress-text').textContent = `${percent}%`;
+    document.getElementById('current-page').textContent = current;
+    document.getElementById('total-pages').textContent = total;
+    
+    const stepLabels = {
+        'initializing': '初始化中...',
+        'loading': '載入 OCR 引擎...',
+        'ocr': '文字辨識中...',
+        'generating': '生成結果...',
+        'done': '完成！'
+    };
+    document.getElementById('current-step').textContent = stepLabels[step] || step;
+}
+
+// ===== AI 模式處理 =====
+async function processWithAI(outputRatio, removeWatermark) {
+    try {
         const res = await fetch(`${API_BASE}/process/pptx`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -259,6 +441,7 @@ async function startProcess() {
     } catch (err) {
         console.error('Process error:', err);
         alert('處理失敗');
+        showSection('analyze-section');
     }
 }
 

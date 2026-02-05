@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>94RePdf - 就是讓 PDF 重生</title>
     <link rel="stylesheet" href="css/style.css">
+    <!-- Tesseract.js 本地 OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- PDF.js -->
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4/build/pdf.min.mjs" type="module"></script>
 </head>
 <body>
     <!-- 密碼驗證區 -->
@@ -104,6 +108,38 @@
                     <p>💰 費用：<strong id="cost" title="Gemini 2.0 Flash 定價">計算中...</strong></p>
                     <p class="hint">Gemini 2.0 Flash: 每頁約 NT$0.012 | 免費額度：每日 500 請求</p>
                 </div>
+            </div>
+
+            <!-- OCR 模式選擇 -->
+            <div class="ocr-mode-settings">
+                <h3>🔍 OCR 模式</h3>
+                <div class="ocr-mode-cards">
+                    <div class="ocr-mode-card selected" data-mode="local">
+                        <span class="mode-icon">💻</span>
+                        <h4>本地處理</h4>
+                        <p class="mode-desc">在你的裝置上處理</p>
+                        <ul class="mode-features">
+                            <li>✅ 完全免費</li>
+                            <li>✅ 無限使用</li>
+                            <li>✅ 隱私保護</li>
+                            <li>⚠️ 中文辨識中等</li>
+                        </ul>
+                        <span class="mode-price">🆓 免費</span>
+                    </div>
+                    <div class="ocr-mode-card" data-mode="ai">
+                        <span class="mode-icon">🤖</span>
+                        <h4>AI 增強</h4>
+                        <p class="mode-desc">使用 Gemini AI</p>
+                        <ul class="mode-features">
+                            <li>✅ 高準確度</li>
+                            <li>✅ 中文辨識優秀</li>
+                            <li>✅ 複雜排版</li>
+                            <li>⚠️ 有額度限制</li>
+                        </ul>
+                        <span class="mode-price">每頁 NT$0.01</span>
+                    </div>
+                </div>
+                <p class="hint" id="ocr-mode-hint">💡 建議：先用本地處理，不滿意再用 AI 增強</p>
             </div>
 
             <div class="output-settings">
