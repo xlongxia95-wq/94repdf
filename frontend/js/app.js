@@ -551,8 +551,8 @@ function showOCRResult(result, imageData) {
         <div style="width: 100%; padding: 1rem;">
             <img src="${imageData}" style="max-width: 100%; height: auto; border-radius: 0.5rem; margin-bottom: 1rem;" />
             <div style="padding: 1rem; background: var(--bg); border-radius: 0.5rem; border: 1px solid var(--border);">
-                <h4 style="margin-bottom: 0.5rem;">📝 ${result.mode} 辨識結果</h4>
-                <pre style="white-space: pre-wrap; font-size: 14px; max-height: 300px; overflow-y: auto; background: var(--card-bg); padding: 1rem; border-radius: 0.5rem;">${result.text || '(無辨識結果)'}</pre>
+                <h4 style="margin-bottom: 0.5rem;">📝 ${escapeHtml(result.mode)} 辨識結果</h4>
+                <pre style="white-space: pre-wrap; font-size: 14px; max-height: 300px; overflow-y: auto; background: var(--card-bg); padding: 1rem; border-radius: 0.5rem;">${escapeHtml(result.text) || '(無辨識結果)'}</pre>
                 <p style="margin-top: 0.5rem; color: var(--text-light); font-size: 0.875rem;">
                     信心度：${Math.round(result.confidence || 0)}%
                 </p>
@@ -664,4 +664,11 @@ function getCookie(name) {
         const parts = v.split('=');
         return parts[0] === name ? parts[1] : r;
     }, '');
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
