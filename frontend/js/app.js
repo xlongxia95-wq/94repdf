@@ -1,12 +1,15 @@
 /**
  * 94RePdf - 就是讓 PDF 重生
- * 前端主程式
+ * 前端主程式 - 支援三種 OCR 模式
  */
 
-// API 位置（部署時會設定為雲端 URL）
+// API 位置
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? '/api'
     : 'https://nine4repdf.onrender.com/api';
+
+// Ollama 本地服務位置
+const OLLAMA_BASE = 'http://localhost:11434';
 
 // 狀態
 let state = {
@@ -15,8 +18,10 @@ let state = {
     fileId: null,
     taskId: null,
     analysis: null,
-    ocrMode: 'local',  // 'local' 或 'ai'
-    uploadedFile: null  // 儲存上傳的檔案供本地處理
+    ocrMode: 'tesseract',  // 'ollama', 'tesseract', 'gemini'
+    uploadedFile: null,
+    ollamaAvailable: false,
+    tesseractWorker: null
 };
 
 // DOM 元素
@@ -37,42 +42,127 @@ document.addEventListener('DOMContentLoaded', () => {
     initFeatureCards();
     initProcess();
     initOcrModeSelector();
+    checkOllamaAvailability();
 });
+
+// ===== Ollama 可用性檢查 =====
+async function checkOllamaAvailability() {
+    const statusEl = document.getElementById('ollama-status');
+    const card = document.querySelector('.ocr-mode-card[data-mode="ollama"]');
+    
+    if (!statusEl || !card) return;
+    
+    try {
+        // 嘗試連接 Ollama
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000);
+        
+        const res = await fetch(`${OLLAMA_BASE}/api/tags`, {
+            signal: controller.signal
+        });
+        clearTimeout(timeout);
+        
+        if (res.ok) {
+            const data = await res.json();
+            // 檢查是否有 qwen3-vl 模型
+            const hasQwen = data.models?.some(m => 
+                m.name.includes('qwen') && m.name.includes('vl')
+            );
+            
+            if (hasQwen) {
+                statusEl.textContent = '✓ 可用';
+                statusEl.className = 'mode-badge available';
+                card.classList.remove('unavailable');
+                state.ollamaAvailable = true;
+                
+                // 如果 Ollama 可用，設為預設
+                selectOcrMode('ollama');
+                return;
+            } else {
+                statusEl.textContent = '需安裝模型';
+                statusEl.className = 'mode-badge unavailable';
+                statusEl.title = '請執行: ollama pull qwen3-vl:8b';
+            }
+        }
+    } catch (err) {
+        console.log('Ollama not available:', err.message);
+    }
+    
+    // Ollama 不可用
+    statusEl.textContent = '未安裝';
+    statusEl.className = 'mode-badge unavailable';
+    card.classList.add('unavailable');
+    state.ollamaAvailable = false;
+}
 
 // ===== OCR 模式選擇 =====
 function initOcrModeSelector() {
     document.querySelectorAll('.ocr-mode-card').forEach(card => {
         card.addEventListener('click', () => {
-            // 移除其他選擇
-            document.querySelectorAll('.ocr-mode-card').forEach(c => c.classList.remove('selected'));
-            // 選擇當前
-            card.classList.add('selected');
-            state.ocrMode = card.dataset.mode;
+            const mode = card.dataset.mode;
             
-            // 更新費用顯示
-            updateCostDisplay();
+            // 檢查 Ollama 是否可用
+            if (mode === 'ollama' && !state.ollamaAvailable) {
+                alert('⚠️ 本地 AI 需要安裝 Ollama\n\n請先安裝：\n1. brew install ollama\n2. ollama serve\n3. ollama pull qwen3-vl:8b');
+                return;
+            }
             
-            console.log('OCR mode selected:', state.ocrMode);
+            selectOcrMode(mode);
         });
     });
 }
 
+function selectOcrMode(mode) {
+    // 移除其他選擇
+    document.querySelectorAll('.ocr-mode-card').forEach(c => c.classList.remove('selected'));
+    // 選擇當前
+    const card = document.querySelector(`.ocr-mode-card[data-mode="${mode}"]`);
+    if (card) card.classList.add('selected');
+    
+    state.ocrMode = mode;
+    updateCostDisplay();
+    updateHintText();
+    
+    console.log('OCR mode selected:', mode);
+}
+
 function updateCostDisplay() {
     const costEl = document.getElementById('cost');
+    if (!costEl) return;
+    
     const pages = state.analysis?.pages || 10;
     
-    if (state.ocrMode === 'local') {
-        costEl.innerHTML = `🆓 <span style="color: green;">完全免費</span>`;
-        costEl.title = '本地處理：在你的裝置上執行，完全免費';
-    } else {
-        const costPerPage = 0.0004;
-        const totalUSD = pages * costPerPage;
-        const totalTWD = totalUSD * 31;
-        costEl.innerHTML = 
-            `🆓 <span style="color: green;">免費額度內</span><br>` +
-            `<small style="color: #666;">超出：$${totalUSD.toFixed(4)} (NT$${totalTWD.toFixed(2)})</small>`;
-        costEl.title = 'AI 模式：Gemini 2.0 Flash，每頁約 NT$0.012';
+    switch (state.ocrMode) {
+        case 'ollama':
+            costEl.innerHTML = `🆓 <span style="color: green;">完全免費</span>`;
+            costEl.title = '本地 AI：使用你電腦的 GPU，完全免費無限制';
+            break;
+        case 'tesseract':
+            costEl.innerHTML = `🆓 <span style="color: green;">完全免費</span>`;
+            costEl.title = '本地 OCR：純瀏覽器運行，完全免費';
+            break;
+        case 'gemini':
+            const costPerPage = 0.0004;
+            const totalUSD = pages * costPerPage;
+            const totalTWD = totalUSD * 31;
+            costEl.innerHTML = 
+                `🆓 <span style="color: green;">免費額度內</span><br>` +
+                `<small style="color: #666;">超出：$${totalUSD.toFixed(4)} (NT$${totalTWD.toFixed(2)})</small>`;
+            costEl.title = 'Gemini 2.0 Flash: 每頁約 NT$0.012，每日 500 免費請求';
+            break;
     }
+}
+
+function updateHintText() {
+    const hintEl = document.getElementById('ocr-mode-hint');
+    if (!hintEl) return;
+    
+    const hints = {
+        'ollama': '✨ 最佳選擇！使用本地 AI 模型，準確度高且完全免費',
+        'tesseract': '📄 純瀏覽器運行，不需網路，適合簡單文件',
+        'gemini': '☁️ 雲端 AI，最高準確度，適合複雜排版'
+    };
+    hintEl.textContent = hints[state.ocrMode] || '';
 }
 
 // ===== 密碼驗證 =====
@@ -82,33 +172,28 @@ function initAuth() {
         if (e.key === 'Enter') handleAuth();
     });
     
-    // 檢查是否已驗證（從 cookie）
+    // 檢查是否已驗證
     if (getCookie('authenticated') === 'true') {
         showMainScreen();
     }
 }
 
 async function handleAuth() {
-    console.log('handleAuth called');
     const password = elements.passwordInput.value;
-    console.log('Password entered:', password ? '***' : 'empty');
     if (!password) {
         alert('請輸入密碼');
         return;
     }
     
     try {
-        console.log('Calling API:', API_BASE + '/auth/verify');
         const res = await fetch(`${API_BASE}/auth/verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ password })
         });
         
-        console.log('API response:', res.status);
         if (res.ok) {
             setCookie('authenticated', 'true', 7);
-            console.log('Showing main screen...');
             showMainScreen();
         } else {
             alert('密碼錯誤');
@@ -133,7 +218,6 @@ function initFeatureCards() {
             const feature = card.dataset.feature;
             state.currentFeature = feature;
             
-            // 更新上傳標題
             const titles = {
                 'pptx': '上傳 PDF 轉 PPTX',
                 'quick-edit': '上傳檔案進行快速編輯',
@@ -154,10 +238,8 @@ function initUpload() {
     const dropZone = elements.dropZone;
     const fileInput = elements.fileInput;
     
-    // 點擊上傳
     dropZone.addEventListener('click', () => fileInput.click());
     
-    // 拖放
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
         dropZone.classList.add('dragover');
@@ -170,14 +252,11 @@ function initUpload() {
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropZone.classList.remove('dragover');
-        
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            handleFile(files[0]);
+        if (e.dataTransfer.files.length > 0) {
+            handleFile(e.dataTransfer.files[0]);
         }
     });
     
-    // 檔案選擇
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) {
             handleFile(fileInput.files[0]);
@@ -186,24 +265,20 @@ function initUpload() {
 }
 
 async function handleFile(file) {
-    // 檢查檔案類型
     const validTypes = ['application/pdf', 'image/png', 'image/jpeg'];
     if (!validTypes.includes(file.type)) {
         alert('只支援 PDF、PNG、JPG 格式');
         return;
     }
     
-    // 檢查大小
     if (file.size > 50 * 1024 * 1024) {
         alert('檔案超過 50MB 限制');
         return;
     }
     
-    // 儲存檔案供本地處理使用
     state.uploadedFile = file;
     
     try {
-        // 上傳檔案到後端（AI 模式需要）
         const formData = new FormData();
         formData.append('file', file);
         
@@ -217,18 +292,16 @@ async function handleFile(file) {
         const uploadData = await uploadRes.json();
         state.fileId = uploadData.file_id;
         
-        // 分析檔案
         const analyzeRes = await fetch(`${API_BASE}/analyze/${state.fileId}`);
         const analyzeData = await analyzeRes.json();
         state.analysis = analyzeData.analysis;
         
-        // 更新 UI
         updateAnalyzeUI(file.name, file.size, analyzeData.analysis);
         showSection('analyze-section');
         
     } catch (err) {
         console.error('Upload error:', err);
-        // 即使上傳失敗，本地模式仍可使用
+        // 本地模式仍可用
         state.analysis = {
             pages: 1,
             original_size: { name: 'Unknown', width_mm: 0, height_mm: 0 },
@@ -253,29 +326,12 @@ function updateAnalyzeUI(filename, size, analysis) {
     
     const typeLabels = {
         'native_pdf': '原生 PDF（有文字層）',
-        'image_pdf': '圖片式 PDF（需要 AI 辨識）',
+        'image_pdf': '圖片式 PDF（需要 OCR）',
         'mixed': '混合型 PDF'
     };
     document.getElementById('pdf-type').textContent = typeLabels[analysis.type] || analysis.type;
     
-    // 費用計算：Gemini 2.0 Flash
-    // 每頁約 $0.0004 USD = NT$0.012
-    const pages = analysis.pages || 10;
-    const costPerPage = 0.0004; // USD
-    const totalUSD = pages * costPerPage;
-    const totalTWD = totalUSD * 31;
-    
-    // 免費額度內（每日 500 請求）
-    if (pages <= 500) {
-        document.getElementById('cost').innerHTML = 
-            `🆓 <span style="color: green;">免費額度內</span><br>` +
-            `<small style="color: #666;">超出額度：約 $${totalUSD.toFixed(4)} USD (NT$${totalTWD.toFixed(2)})</small>`;
-    } else {
-        document.getElementById('cost').textContent = 
-            `約 $${totalUSD.toFixed(4)} USD (NT$${totalTWD.toFixed(2)})`;
-    }
-    document.getElementById('cost').title = 
-        `Gemini 2.0 Flash: 每頁約 NT$0.012\n免費額度：每日 500 請求`;
+    updateCostDisplay();
 }
 
 // ===== 處理 =====
@@ -289,17 +345,23 @@ async function startProcess() {
     
     showSection('progress-section');
     
-    // 兩種模式都用後端處理，差別在 use_local 參數
-    // local = 後端 Ollama 視覺模型（完全免費）
-    // ai = 後端 Gemini API
-    const useLocal = state.ocrMode === 'local';
-    await processWithBackend(outputRatio, removeWatermark, useLocal);
+    switch (state.ocrMode) {
+        case 'ollama':
+            await processWithOllama();
+            break;
+        case 'tesseract':
+            await processWithTesseract();
+            break;
+        case 'gemini':
+            await processWithGemini(outputRatio, removeWatermark);
+            break;
+    }
 }
 
-// ===== 本地 OCR 處理 =====
-async function processWithLocalOCR() {
+// ===== Ollama 本地 AI 處理 =====
+async function processWithOllama() {
     try {
-        updateProgressUI(0, 1, 1, 'initializing');
+        updateProgressUI(0, 1, 1, '連接本地 AI...');
         
         const file = state.uploadedFile;
         if (!file) {
@@ -307,121 +369,110 @@ async function processWithLocalOCR() {
             return;
         }
         
-        // 初始化 Tesseract worker
-        updateProgressUI(5, 1, 1, 'loading');
-        const worker = await Tesseract.createWorker('chi_tra+eng', 1, {
-            logger: m => {
-                if (m.status === 'recognizing text') {
-                    const percent = Math.round(10 + m.progress * 80);
-                    updateProgressUI(percent, 1, 1, 'ocr');
-                }
-            }
-        });
-        
-        let imageData;
-        
-        // 如果是圖片，直接處理
-        if (file.type.startsWith('image/')) {
-            imageData = await fileToDataURL(file);
-        } else {
-            // PDF 需要轉成圖片（使用 canvas）
-            // 簡化版：提示用戶先轉成圖片
-            alert('本地模式目前只支援圖片（PNG/JPG）。\nPDF 請使用 AI 模式，或先將 PDF 轉成圖片。');
-            await worker.terminate();
+        // 檢查是否為圖片
+        if (!file.type.startsWith('image/')) {
+            alert('本地 AI 模式目前只支援圖片（PNG/JPG）。\nPDF 請使用雲端 AI 模式。');
             showSection('analyze-section');
             return;
         }
         
-        // 執行 OCR
-        updateProgressUI(10, 1, 1, 'ocr');
+        // 轉換為 base64
+        const base64 = await fileToBase64(file);
+        
+        updateProgressUI(10, 1, 1, 'Qwen3-VL 分析中...');
+        
+        // 呼叫 Ollama API
+        const res = await fetch(`${OLLAMA_BASE}/api/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: 'qwen3-vl:8b',
+                prompt: '請辨識這張圖片中的所有文字，保持原始排版格式。只輸出辨識結果，不要加其他說明。',
+                images: [base64],
+                stream: false
+            })
+        });
+        
+        if (!res.ok) {
+            throw new Error('Ollama API 錯誤');
+        }
+        
+        const data = await res.json();
+        updateProgressUI(100, 1, 1, '完成！');
+        
+        // 顯示結果
+        const imageData = await fileToDataURL(file);
+        showOCRResult({
+            text: data.response,
+            confidence: 95,
+            mode: 'Qwen3-VL (本地 AI)'
+        }, imageData);
+        
+    } catch (err) {
+        console.error('Ollama error:', err);
+        alert('本地 AI 處理失敗：' + err.message + '\n\n請確認 Ollama 正在運行');
+        showSection('analyze-section');
+    }
+}
+
+// ===== Tesseract.js 本地 OCR 處理 =====
+async function processWithTesseract() {
+    try {
+        updateProgressUI(0, 1, 1, '初始化 OCR 引擎...');
+        
+        const file = state.uploadedFile;
+        if (!file) {
+            alert('請先上傳檔案');
+            return;
+        }
+        
+        // 檢查是否為圖片
+        if (!file.type.startsWith('image/')) {
+            alert('本地 OCR 模式只支援圖片（PNG/JPG）。\n\nPDF 請選擇「雲端 AI」模式。');
+            showSection('analyze-section');
+            return;
+        }
+        
+        updateProgressUI(5, 1, 1, '載入語言包...');
+        
+        // 初始化 Tesseract worker (中文繁體 + 英文)
+        const worker = await Tesseract.createWorker('chi_tra+eng', 1, {
+            logger: m => {
+                if (m.status === 'recognizing text') {
+                    const percent = Math.round(20 + m.progress * 70);
+                    updateProgressUI(percent, 1, 1, '文字辨識中...');
+                } else if (m.status === 'loading language traineddata') {
+                    updateProgressUI(10, 1, 1, '載入語言包...');
+                }
+            }
+        });
+        
+        const imageData = await fileToDataURL(file);
+        
+        updateProgressUI(20, 1, 1, '文字辨識中...');
         const { data } = await worker.recognize(imageData);
-        
-        updateProgressUI(90, 1, 1, 'generating');
-        
-        // 顯示 OCR 結果
-        console.log('OCR Result:', data);
-        
-        // 儲存結果
-        state.ocrResult = data;
         
         await worker.terminate();
         
-        updateProgressUI(100, 1, 1, 'done');
+        updateProgressUI(100, 1, 1, '完成！');
         
-        // 顯示結果
-        setTimeout(() => {
-            showOCRResult(data, imageData);
-        }, 500);
+        showOCRResult({
+            text: data.text,
+            confidence: data.confidence,
+            mode: 'Tesseract.js (本地 OCR)'
+        }, imageData);
         
     } catch (err) {
-        console.error('Local OCR error:', err);
+        console.error('Tesseract error:', err);
         alert('本地 OCR 處理失敗：' + err.message);
         showSection('analyze-section');
     }
 }
 
-function fileToDataURL(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-}
-
-function showOCRResult(ocrData, imageData) {
-    showSection('result-section');
-    
-    // 顯示預覽圖片
-    const previewArea = document.getElementById('preview-area');
-    previewArea.innerHTML = `
-        <div style="position: relative; width: 100%;">
-            <img src="${imageData}" style="max-width: 100%; height: auto;" />
-            <div style="margin-top: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 0.5rem;">
-                <h4>📝 OCR 辨識結果</h4>
-                <pre style="white-space: pre-wrap; font-size: 14px; max-height: 300px; overflow-y: auto;">${ocrData.text}</pre>
-                <p style="margin-top: 0.5rem; color: #666;">信心度：${Math.round(ocrData.confidence)}%</p>
-            </div>
-        </div>
-    `;
-    
-    // 更新下載按鈕
-    document.getElementById('download-pptx').textContent = '複製文字';
-    document.getElementById('download-pptx').onclick = () => {
-        navigator.clipboard.writeText(ocrData.text);
-        alert('已複製到剪貼簿！');
-    };
-    
-    document.getElementById('download-pdf').textContent = '下載原圖';
-    document.getElementById('download-pdf').onclick = () => {
-        const link = document.createElement('a');
-        link.href = imageData;
-        link.download = 'result.png';
-        link.click();
-    };
-}
-
-function updateProgressUI(percent, current, total, step) {
-    document.getElementById('progress-fill').style.width = `${percent}%`;
-    document.getElementById('progress-text').textContent = `${percent}%`;
-    document.getElementById('current-page').textContent = current;
-    document.getElementById('total-pages').textContent = total;
-    
-    const stepLabels = {
-        'initializing': '初始化中...',
-        'loading': '載入 OCR 引擎...',
-        'ocr': '文字辨識中...',
-        'generating': '生成結果...',
-        'done': '完成！'
-    };
-    document.getElementById('current-step').textContent = stepLabels[step] || step;
-}
-
-// ===== 後端處理（本地 Ollama 或 Gemini API）=====
-async function processWithBackend(outputRatio, removeWatermark, useLocal = true) {
+// ===== Gemini 雲端 AI 處理 =====
+async function processWithGemini(outputRatio, removeWatermark) {
     try {
-        const modeLabel = useLocal ? '本地 Ollama' : 'Gemini API';
-        console.log(`Starting process with ${modeLabel} mode`);
+        updateProgressUI(0, 1, 1, '連接雲端 AI...');
         
         const res = await fetch(`${API_BASE}/process/pptx`, {
             method: 'POST',
@@ -430,19 +481,18 @@ async function processWithBackend(outputRatio, removeWatermark, useLocal = true)
                 file_id: state.fileId,
                 output_ratio: outputRatio,
                 remove_watermark: removeWatermark,
-                use_local: useLocal  // true = Ollama, false = Gemini
+                use_local: false  // 使用 Gemini
             })
         });
         
         const data = await res.json();
         state.taskId = data.task_id;
         
-        // 開始輪詢進度
         pollProgress();
         
     } catch (err) {
-        console.error('Process error:', err);
-        alert('處理失敗');
+        console.error('Gemini process error:', err);
+        alert('雲端 AI 處理失敗：' + err.message);
         showSection('analyze-section');
     }
 }
@@ -456,8 +506,9 @@ async function pollProgress() {
         
         if (data.status === 'done') {
             showSection('result-section');
+            setupDownloadButtons();
         } else if (data.status === 'failed') {
-            alert('處理失敗');
+            alert('處理失敗：' + (data.error || '未知錯誤'));
             showSection('analyze-section');
         } else {
             setTimeout(pollProgress, 1000);
@@ -475,14 +526,90 @@ function updateProgress(progress) {
     document.getElementById('total-pages').textContent = progress.total_pages;
     
     const stepLabels = {
-        'ocr': 'OCR 文字辨識',
-        'inpainting': '背景重建',
-        'pptx': 'PPTX 生成'
+        'ocr': 'Gemini AI 辨識中...',
+        'inpainting': '背景重建...',
+        'pptx': 'PPTX 生成中...'
     };
     document.getElementById('current-step').textContent = stepLabels[progress.current_step] || progress.current_step;
 }
 
+// ===== 結果顯示 =====
+function showOCRResult(result, imageData) {
+    showSection('result-section');
+    
+    const previewArea = document.getElementById('preview-area');
+    previewArea.innerHTML = `
+        <div style="width: 100%; padding: 1rem;">
+            <img src="${imageData}" style="max-width: 100%; height: auto; border-radius: 0.5rem; margin-bottom: 1rem;" />
+            <div style="padding: 1rem; background: var(--bg); border-radius: 0.5rem; border: 1px solid var(--border);">
+                <h4 style="margin-bottom: 0.5rem;">📝 ${result.mode} 辨識結果</h4>
+                <pre style="white-space: pre-wrap; font-size: 14px; max-height: 300px; overflow-y: auto; background: var(--card-bg); padding: 1rem; border-radius: 0.5rem;">${result.text || '(無辨識結果)'}</pre>
+                <p style="margin-top: 0.5rem; color: var(--text-light); font-size: 0.875rem;">
+                    信心度：${Math.round(result.confidence || 0)}%
+                </p>
+            </div>
+        </div>
+    `;
+    
+    // 更新按鈕
+    const downloadPptx = document.getElementById('download-pptx');
+    const downloadPdf = document.getElementById('download-pdf');
+    
+    downloadPptx.textContent = '📋 複製文字';
+    downloadPptx.onclick = () => {
+        navigator.clipboard.writeText(result.text);
+        downloadPptx.textContent = '✅ 已複製！';
+        setTimeout(() => downloadPptx.textContent = '📋 複製文字', 2000);
+    };
+    
+    downloadPdf.textContent = '💾 下載原圖';
+    downloadPdf.onclick = () => {
+        const link = document.createElement('a');
+        link.href = imageData;
+        link.download = 'ocr-result.png';
+        link.click();
+    };
+}
+
+function setupDownloadButtons() {
+    const downloadPptx = document.getElementById('download-pptx');
+    downloadPptx.textContent = '⬇️ 下載 PPTX';
+    downloadPptx.onclick = async () => {
+        window.location.href = `${API_BASE}/download/${state.taskId}`;
+    };
+}
+
 // ===== 工具函數 =====
+function updateProgressUI(percent, current, total, step) {
+    document.getElementById('progress-fill').style.width = `${percent}%`;
+    document.getElementById('progress-text').textContent = `${percent}%`;
+    document.getElementById('current-page').textContent = current;
+    document.getElementById('total-pages').textContent = total;
+    document.getElementById('current-step').textContent = step;
+}
+
+function fileToDataURL(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            // 移除 data:image/xxx;base64, 前綴
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
 function showSection(sectionId) {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.getElementById(sectionId).classList.add('active');

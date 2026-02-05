@@ -113,33 +113,48 @@
             <!-- OCR 模式選擇 -->
             <div class="ocr-mode-settings">
                 <h3>🔍 OCR 模式</h3>
-                <div class="ocr-mode-cards">
-                    <div class="ocr-mode-card selected" data-mode="local">
-                        <span class="mode-icon">💻</span>
-                        <h4>本地處理</h4>
-                        <p class="mode-desc">在你的裝置上處理</p>
+                <div class="ocr-mode-cards three-cols">
+                    <div class="ocr-mode-card" data-mode="ollama">
+                        <span class="mode-icon">🏠</span>
+                        <span class="mode-badge unavailable" id="ollama-status">檢查中...</span>
+                        <h4>本地 AI</h4>
+                        <p class="mode-desc">Qwen3-VL (Ollama)</p>
                         <ul class="mode-features">
                             <li>✅ 完全免費</li>
-                            <li>✅ 無限使用</li>
-                            <li>✅ 隱私保護</li>
-                            <li>⚠️ 中文辨識中等</li>
+                            <li>✅ 最佳中文辨識</li>
+                            <li>✅ 完全隱私</li>
+                            <li>⚠️ 需安裝 Ollama</li>
                         </ul>
                         <span class="mode-price">🆓 免費</span>
                     </div>
-                    <div class="ocr-mode-card" data-mode="ai">
-                        <span class="mode-icon">🤖</span>
-                        <h4>AI 增強</h4>
-                        <p class="mode-desc">使用 Gemini AI</p>
+                    <div class="ocr-mode-card selected" data-mode="tesseract">
+                        <span class="mode-icon">📄</span>
+                        <span class="mode-badge available">✓ 可用</span>
+                        <h4>本地 OCR</h4>
+                        <p class="mode-desc">Tesseract.js</p>
                         <ul class="mode-features">
-                            <li>✅ 高準確度</li>
-                            <li>✅ 中文辨識優秀</li>
+                            <li>✅ 完全免費</li>
+                            <li>✅ 純瀏覽器運行</li>
+                            <li>✅ 完全隱私</li>
+                            <li>⚠️ 中文需下載語言包</li>
+                        </ul>
+                        <span class="mode-price">🆓 免費</span>
+                    </div>
+                    <div class="ocr-mode-card" data-mode="gemini">
+                        <span class="mode-icon">☁️</span>
+                        <span class="mode-badge available">✓ 可用</span>
+                        <h4>雲端 AI</h4>
+                        <p class="mode-desc">Gemini 2.0 Flash</p>
+                        <ul class="mode-features">
+                            <li>✅ 最高準確度</li>
+                            <li>✅ 最佳中文辨識</li>
                             <li>✅ 複雜排版</li>
                             <li>⚠️ 有額度限制</li>
                         </ul>
-                        <span class="mode-price">每頁 NT$0.01</span>
+                        <span class="mode-price">每頁 ~NT$0.01</span>
                     </div>
                 </div>
-                <p class="hint" id="ocr-mode-hint">💡 建議：先用本地處理，不滿意再用 AI 增強</p>
+                <p class="hint" id="ocr-mode-hint">💡 推薦順序：本地 AI → 本地 OCR → 雲端 AI</p>
             </div>
 
             <div class="output-settings">

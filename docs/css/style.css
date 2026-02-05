@@ -468,6 +468,10 @@ header .slogan {
     gap: 1rem;
 }
 
+.ocr-mode-cards.three-cols {
+    grid-template-columns: repeat(3, 1fr);
+}
+
 .ocr-mode-card {
     border: 2px solid var(--border);
     border-radius: 0.75rem;
@@ -475,15 +479,46 @@ header .slogan {
     text-align: center;
     cursor: pointer;
     transition: all 0.2s;
+    position: relative;
 }
 
-.ocr-mode-card:hover {
+.ocr-mode-card:hover:not(.unavailable) {
     border-color: var(--primary);
 }
 
 .ocr-mode-card.selected {
     border-color: var(--primary);
     background: rgba(79, 70, 229, 0.05);
+}
+
+.ocr-mode-card.unavailable {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.ocr-mode-card .mode-badge {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.ocr-mode-card .mode-badge.available {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+}
+
+.ocr-mode-card .mode-badge.unavailable {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+}
+
+.ocr-mode-card .mode-badge.checking {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--warning);
 }
 
 .ocr-mode-card .mode-icon {
@@ -524,13 +559,20 @@ header .slogan {
     font-weight: 600;
 }
 
-.ocr-mode-card[data-mode="ai"] .mode-price {
+.ocr-mode-card[data-mode="gemini"] .mode-price {
     background: var(--primary);
 }
 
 #ocr-mode-hint {
     margin-top: 1rem;
     text-align: center;
+}
+
+/* 三欄 RWD */
+@media (max-width: 800px) {
+    .ocr-mode-cards.three-cols {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* RWD */
