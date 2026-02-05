@@ -61,37 +61,63 @@ class PptxService:
     
     def _add_text_box(self, slide, text_data: Dict, scale_x: float, scale_y: float) -> None:
         """添加文字框到投影片"""
+        # 驗證必要欄位
+        content = text_data.get('content', '')
+        if not content:
+            return  # 跳過空內容
+        
         # 計算位置（從像素轉換為 EMU）
         px_to_emu = 914400 / 96  # 96 DPI
         
-        left = Emu(int(text_data['x'] * px_to_emu * scale_x))
-        top = Emu(int(text_data['y'] * px_to_emu * scale_y))
-        width = Emu(int(text_data['width'] * px_to_emu * scale_x))
-        height = Emu(int(text_data['height'] * px_to_emu * scale_y))
+        x = text_data.get('x', 0)
+        y = text_data.get('y', 0)
+        w = text_data.get('width', 200)
+        h = text_data.get('height', 50)
         
-        # 添加文字框
-        textbox = slide.shapes.add_textbox(left, top, width, height)
-        tf = textbox.text_frame
-        tf.word_wrap = True
-        
-        p = tf.paragraphs[0]
-        p.text = text_data['content']
-        
-        # 設定字體大小
-        if 'font_size' in text_data:
-            p.font.size = Pt(text_data['font_size'])
-        
-        # 設定粗體
-        if text_data.get('font_weight') == 'bold':
-            p.font.bold = True
-        
-        # 設定顏色
-        if 'color' in text_data:
-            hex_color = text_data['color'].lstrip('#')
-            r = int(hex_color[0:2], 16)
-            g = int(hex_color[2:4], 16)
-            b = int(hex_color[4:6], 16)
-            p.font.color.rgb = RGBColor(r, g, b)
+        try:
+            left = Emu(int(x * px_to_emu * scale_x))
+            top = Emu(int(y * px_to_emu * scale_y))
+            width = Emu(int(w * px_to_emu * scale_x))
+            height = Emu(int(h * px_to_emu * scale_y))
+            
+            # 確保尺寸有效
+            if width <= 0:
+                width = Emu(int(200 * px_to_emu * scale_x))
+            if height <= 0:
+                height = Emu(int(50 * px_to_emu * scale_y))
+            
+            # 添加文字框
+            textbox = slide.shapes.add_textbox(left, top, width, height)
+            tf = textbox.text_frame
+            tf.word_wrap = True
+            
+            p = tf.paragraphs[0]
+            p.text = content
+            
+            # 設定字體大小
+            font_size = text_data.get('font_size')
+            if font_size and isinstance(font_size, (int, float)) and font_size > 0:
+                p.font.size = Pt(int(font_size))
+            
+            # 設定粗體
+            if text_data.get('font_weight') == 'bold':
+                p.font.bold = True
+            
+            # 設定顏色
+            color = text_data.get('color', '')
+            if color and len(color) >= 6:
+                hex_color = color.lstrip('#')
+                if len(hex_color) >= 6:
+                    try:
+                        r = int(hex_color[0:2], 16)
+                        g = int(hex_color[2:4], 16)
+                        b = int(hex_color[4:6], 16)
+                        p.font.color.rgb = RGBColor(r, g, b)
+                    except ValueError:
+                        pass  # 無效的顏色格式，跳過
+        except Exception as e:
+            print(f"Error adding text box: {e}")
+            # 繼續處理其他文字框
     
     def save(self) -> bytes:
         """儲存並返回 PPTX bytes"""
