@@ -38,6 +38,10 @@ async def upload_file(file: UploadFile = File(...)):
     content = await file.read()
     file_size = len(content)
     
+    # 檢查檔案是否為空
+    if file_size == 0:
+        raise HTTPException(status_code=400, detail="檔案是空的")
+    
     # 檢查檔案大小 (50MB)
     if file_size > 50 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="檔案超過 50MB 限制")
@@ -51,9 +55,13 @@ async def upload_file(file: UploadFile = File(...)):
         try:
             pdf = PdfReader(io.BytesIO(content))
             pages = len(pdf.pages)
+            if pages == 0:
+                raise HTTPException(status_code=400, detail="PDF 沒有頁面")
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"PDF 分析錯誤: {e}")
-            pages = 1
+            raise HTTPException(status_code=400, detail=f"無法讀取 PDF: {str(e)}")
     
     # 儲存檔案到暫存目錄
     ext = os.path.splitext(file.filename)[1]
