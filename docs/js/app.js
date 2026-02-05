@@ -566,7 +566,17 @@ function showOCRResult(result, imageData) {
     
     downloadPptx.textContent = '📋 複製文字';
     downloadPptx.onclick = () => {
-        navigator.clipboard.writeText(result.text);
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(result.text);
+        } else {
+            // Fallback for older browsers
+            const textarea = document.createElement('textarea');
+            textarea.value = result.text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+        }
         downloadPptx.textContent = '✅ 已複製！';
         setTimeout(() => downloadPptx.textContent = '📋 複製文字', 2000);
     };
