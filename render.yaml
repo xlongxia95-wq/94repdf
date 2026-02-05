@@ -1,14 +1,14 @@
 services:
   - type: web
     name: 94repdf-api
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     envVars:
       - key: GEMINI_API_KEY
         sync: false
       - key: PASSWORD_HASH
         value: 5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8
-    rootDir: backend
     plan: free
     healthCheckPath: /health
+    autoDeploy: true
