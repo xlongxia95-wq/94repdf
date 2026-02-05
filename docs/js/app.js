@@ -6,7 +6,7 @@
 // API 位置（部署時會設定為雲端 URL）
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? '/api'
-    : 'https://steven-fame-pod-vacancies.trycloudflare.com/api';
+    : 'https://nine4repdf.onrender.com/api';
 
 // 狀態
 let state = {
@@ -289,13 +289,11 @@ async function startProcess() {
     
     showSection('progress-section');
     
-    if (state.ocrMode === 'local') {
-        // 本地 OCR 模式
-        await processWithLocalOCR();
-    } else {
-        // AI 模式（使用後端 Gemini）
-        await processWithAI(outputRatio, removeWatermark);
-    }
+    // 兩種模式都用後端處理，差別在 use_local 參數
+    // local = 後端 Ollama 視覺模型（完全免費）
+    // ai = 後端 Gemini API
+    const useLocal = state.ocrMode === 'local';
+    await processWithBackend(outputRatio, removeWatermark, useLocal);
 }
 
 // ===== 本地 OCR 處理 =====
@@ -419,16 +417,20 @@ function updateProgressUI(percent, current, total, step) {
     document.getElementById('current-step').textContent = stepLabels[step] || step;
 }
 
-// ===== AI 模式處理 =====
-async function processWithAI(outputRatio, removeWatermark) {
+// ===== 後端處理（本地 Ollama 或 Gemini API）=====
+async function processWithBackend(outputRatio, removeWatermark, useLocal = true) {
     try {
+        const modeLabel = useLocal ? '本地 Ollama' : 'Gemini API';
+        console.log(`Starting process with ${modeLabel} mode`);
+        
         const res = await fetch(`${API_BASE}/process/pptx`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 file_id: state.fileId,
                 output_ratio: outputRatio,
-                remove_watermark: removeWatermark
+                remove_watermark: removeWatermark,
+                use_local: useLocal  // true = Ollama, false = Gemini
             })
         });
         
