@@ -1,7 +1,10 @@
 """PDF 處理服務"""
+import logging
 from typing import List
 from PIL import Image
 import io
+
+logger = logging.getLogger(__name__)
 
 
 class PdfService:
@@ -28,7 +31,7 @@ class PdfService:
             # 如果沒有 poppler，使用 pypdf + PIL 的方式
             return self._pdf_to_images_fallback(pdf_bytes)
         except Exception as e:
-            print(f"PDF 轉圖片錯誤: {e}")
+            logger.error(f"PDF 轉圖片錯誤: {e}")
             # 嘗試 fallback 方法
             return self._pdf_to_images_fallback(pdf_bytes)
     

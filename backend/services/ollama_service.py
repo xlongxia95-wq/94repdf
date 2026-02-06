@@ -2,9 +2,12 @@
 import json
 import base64
 import httpx
+import logging
 from typing import Dict, List
 from PIL import Image
 import io
+
+logger = logging.getLogger(__name__)
 
 
 class OllamaService:
@@ -95,11 +98,11 @@ class OllamaService:
             return json.loads(result_text)
             
         except json.JSONDecodeError as e:
-            print(f"JSON Parse Error: {e}")
-            print(f"Raw response: {result_text[:500]}")
+            logger.error(f"JSON Parse Error: {e}")
+            logger.debug(f"Raw response: {result_text[:500]}")
             return {"texts": [], "error": f"JSON parse error: {str(e)}"}
         except Exception as e:
-            print(f"Ollama OCR Error: {e}")
+            logger.error(f"Ollama OCR Error: {e}")
             return {"texts": [], "error": str(e)}
     
     async def analyze_slide(self, image_bytes: bytes) -> Dict:
@@ -143,7 +146,7 @@ class OllamaService:
             return json.loads(result_text)
             
         except Exception as e:
-            print(f"Analyze Error: {e}")
+            logger.error(f"Analyze Error: {e}")
             return {
                 "is_notebooklm": False,
                 "has_watermark": False,
@@ -215,10 +218,10 @@ async def test_ollama():
         async with httpx.AsyncClient() as client:
             response = await client.get("http://localhost:11434/api/tags")
             models = response.json().get("models", [])
-            print(f"Available models: {[m['name'] for m in models]}")
+            logger.info(f"Available models: {[m['name'] for m in models]}")
             return True
     except Exception as e:
-        print(f"Ollama test failed: {e}")
+        logger.error(f"Ollama test failed: {e}")
         return False
 
 

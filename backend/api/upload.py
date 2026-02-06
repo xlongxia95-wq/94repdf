@@ -4,10 +4,12 @@ from pydantic import BaseModel
 import uuid
 import os
 import tempfile
+import logging
 from pypdf import PdfReader
 from PIL import Image
 import io
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # 暫存目錄
@@ -63,7 +65,7 @@ async def upload_file(file: UploadFile = File(...)):
         except HTTPException:
             raise
         except Exception as e:
-            print(f"PDF 分析錯誤: {e}")
+            logger.error(f"PDF 分析錯誤: {e}")
             raise HTTPException(status_code=400, detail=f"無法讀取 PDF: {str(e)}")
     
     # 儲存檔案到暫存目錄

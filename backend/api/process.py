@@ -6,12 +6,31 @@ import uuid
 import asyncio
 import os
 import io
+import time
+import logging
+
+# 設定日誌
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# 任務狀態儲存（實際應用應使用 Redis 或資料庫）
+# 任務狀態儲存（含 TTL 自動清理）
 task_status: Dict[str, dict] = {}
 task_results: Dict[str, bytes] = {}
+TASK_TTL_SECONDS = 3600  # 任務保留 1 小時
+
+
+def cleanup_old_tasks():
+    """清理過期的任務"""
+    now = time.time()
+    expired = [
+        task_id for task_id, data in task_status.items()
+        if now - data.get("created_at", now) > TASK_TTL_SECONDS
+    ]
+    for task_id in expired:
+        task_status.pop(task_id, None)
+        task_results.pop(task_id, None)
+        logger.info(f"Cleaned up expired task: {task_id}")
 
 
 class ProcessPptxRequest(BaseModel):
@@ -65,7 +84,8 @@ async def process_pdf_to_pptx(task_id: str, file_id: str, output_ratio: str, rem
     try:
         task_status[task_id] = {
             "status": "processing",
-            "progress": {"current_page": 0, "total_pages": 0, "current_step": "init", "percent": 0, "mode": "local" if use_local else "cloud"}
+            "progress": {"current_page": 0, "total_pages": 0, "current_step": "init", "percent": 0, "mode": "local" if use_local else "cloud"},
+            "created_at": time.time()
         }
         
         # 取得檔案
@@ -143,7 +163,7 @@ async def process_pdf_to_pptx(task_id: str, file_id: str, output_ratio: str, rem
         task_status[task_id]["result_url"] = f"/api/download/{task_id}"
         
     except Exception as e:
-        print(f"Process error: {e}")
+        logger.error(f"Process error for task {task_id}: {e}", exc_info=True)
         task_status[task_id]["status"] = "failed"
         task_status[task_id]["error"] = str(e)
 
@@ -201,6 +221,9 @@ async def process_to_image(request: ProcessImageRequest, background_tasks: Backg
 @router.get("/status/{task_id}", response_model=TaskStatus)
 async def get_task_status(task_id: str):
     """查詢處理狀態"""
+    # 定期清理過期任務
+    cleanup_old_tasks()
+    
     if task_id not in task_status:
         raise HTTPException(status_code=404, detail="Task not found")
     

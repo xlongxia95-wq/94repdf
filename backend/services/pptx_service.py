@@ -1,10 +1,13 @@
 """PPTX 生成服務"""
+import logging
 from typing import List, Dict
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from PIL import Image
 import io
+
+logger = logging.getLogger(__name__)
 
 
 class PptxService:
@@ -116,7 +119,7 @@ class PptxService:
                     except ValueError:
                         pass  # 無效的顏色格式，跳過
         except Exception as e:
-            print(f"Error adding text box: {e}")
+            logger.warning(f"Error adding text box: {e}")
             # 繼續處理其他文字框
     
     def save(self) -> bytes:

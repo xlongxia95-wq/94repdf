@@ -2,6 +2,7 @@
 import os
 import json
 import base64
+import logging
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
 
@@ -9,12 +10,14 @@ load_dotenv()
 
 import google.generativeai as genai
 
+logger = logging.getLogger(__name__)
+
 # 設定 API Key
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 else:
-    print("⚠️ GEMINI_API_KEY not set - Gemini OCR will not work")
+    logger.warning("GEMINI_API_KEY not set - Gemini OCR will not work")
 
 
 class GeminiService:
@@ -84,7 +87,7 @@ class GeminiService:
             
             return json.loads(result_text)
         except Exception as e:
-            print(f"OCR Error: {e}")
+            logger.error(f"OCR Error: {e}", exc_info=True)
             return {"texts": [], "error": str(e)}
     
     async def inpaint_background(self, image_bytes: bytes, text_regions: List[Dict]) -> bytes:
@@ -193,7 +196,7 @@ class GeminiService:
             
             return json.loads(result_text)
         except Exception as e:
-            print(f"Analyze Error: {e}")
+            logger.error(f"Analyze Error: {e}", exc_info=True)
             return {
                 "is_notebooklm": False,
                 "has_watermark": False,
@@ -216,4 +219,4 @@ async def test_gemini():
 if __name__ == "__main__":
     import asyncio
     result = asyncio.run(test_gemini())
-    print(f"Test result: {result}")
+    logger.info(f"Test result: {result}")

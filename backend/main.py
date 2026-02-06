@@ -2,6 +2,19 @@
 94RePdf - 就是讓 PDF 重生
 FastAPI 後端入口
 """
+import logging
+import sys
+
+# 設定日誌
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
 from dotenv import load_dotenv
 load_dotenv()
 

@@ -3,7 +3,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 import io
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -127,7 +129,7 @@ async def analyze_pdf(file_id: str):
             pdf_type = "image_pdf"
             
     except Exception as e:
-        print(f"分析錯誤: {e}")
+        logger.error(f"分析錯誤: {e}")
     
     # 判斷方向
     orientation = "portrait" if height_mm >= width_mm else "landscape"
